@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Aplikasi Antrian Komite - MAN Kota Blitar x Bank Mandiri</title>
+  
+  <meta name="theme-color" content="#003876">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+
+  <!-- Favicon Logo Resmi MAN Kota Blitar -->
+  <link rel="icon" type="image/png" href="https://mankotablitar.sch.id/wp-content/themes/man-kota-blitar/assets/images/logo-man-kota-blitar.png">
+
+  <!-- Tailwind CSS & FontAwesome 6 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            mandiriBlue: '#003876',
+            mandiriBlueDark: '#002550',
+            mandiriGold: '#ffb81c',
+            mandiriGoldDark: '#e69f00',
+            kemenagGreen: '#059669',
+            bgSoft: '#f0f5fa'
+          },
+          boxShadow: {
+            'glow-blue': '0 10px 25px -5px rgba(0, 56, 118, 0.25)',
+            'glow-gold': '0 10px 25px -5px rgba(255, 184, 28, 0.4)'
+          }
+        }
+      }
+    }
+  </script>
+  
+  <style>
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(1); opacity: 0.95; }
+      50% { transform: scale(1.02); opacity: 1; filter: drop-shadow(0 0 8px rgba(0, 56, 118, 0.4)); }
+    }
+    .glowing-badge { animation: pulseGlow 3s infinite ease-in-out; }
+    
+    @keyframes blinkDot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    .blink-status { animation: blinkDot 1.5s infinite; }
+
+    .star-icon {
+      transition: all 0.15s ease-in-out;
+      cursor: pointer;
+    }
+    .star-icon:hover { transform: scale(1.25); }
+
+    @media print {
+      body * { visibility: hidden !important; }
+      
+      body.cetak-tiket #printTiketAntrian, 
+      body.cetak-tiket #printTiketAntrian * { 
+        visibility: visible !important; 
+      }
+      body.cetak-tiket #printTiketAntrian {
+        position: absolute; left: 0; top: 0; width: 100%; max-width: 380px; margin: 0 auto; display: block !important; padding: 10px;
+      }
+
+      body.cetak-stand #printAreaStandMeja, 
+      body.cetak-stand #printAreaStandMeja * { 
+        visibility: visible !important; 
+      }
+      body.cetak-stand #printAreaStandMeja {
+        position: absolute; left: 0; top: 0; width: 100%; display: block !important; margin: 0; padding: 15px;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-slate-100 via-sky-50 to-blue-50 min-h-screen text-slate-800 font-sans antialiased flex flex-col justify-between selection:bg-mandiriBlue selection:text-white">
+
+  <!-- TOAST NOTIFIKASI -->
+  <div id="toastContainer" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- TOP ANNOUNCEMENT ZONA INTEGRITAS -->
+  <aside class="bg-gradient-to-r from-mandiriBlue via-blue-800 to-mandiriBlue text-white py-1.5 px-3 text-center text-xs font-black tracking-wider uppercase shadow-md flex items-center justify-center gap-2">
+    <i class="fas fa-handshake text-mandiriGold"></i>
+    <span>Kemitraan Resmi Komite MAN Kota Blitar x Bank Mandiri • Transparan, Akuntabel & Bebas Pungli</span>
+  </aside>
+
+  <!-- JAM REALTIME & STATUS KONEKSI CLOUD -->
+  <section class="max-w-5xl mx-auto w-full px-4 pt-3">
+    <div class="bg-white/95 border-2 border-sky-300 rounded-2xl p-3 shadow-glow-blue flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+      
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-mandiriBlue text-white flex items-center justify-center text-lg shadow-md shrink-0">
+          <i class="far fa-clock"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span id="liveClock" class="font-mono text-base font-black text-mandiriBlue tracking-wider">00:00:00 WIB</span>
+            <span class="px-2 py-0.5 rounded-full bg-blue-100 text-mandiriBlue text-[10px] font-bold border border-blue-200">WIB</span>
+          </div>
+          <p id="liveDate" class="text-slate-600 text-[11px] font-medium">Memuat tanggal...</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <div id="sheetsStatusBadge" class="flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-3 py-1.5 rounded-xl border border-emerald-300 font-bold text-[11px]">
+          <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 blink-status"></span>
+          <span id="sheetsStatusText">Menghubungkan ke Cloud...</span>
+        </div>
+
+        <div class="flex items-center gap-2 bg-blue-50 px-3.5 py-1.5 rounded-xl border border-blue-200">
+          <div id="statusDot" class="w-2.5 h-2.5 rounded-full bg-emerald-500 blink-status"></div>
+          <div>
+            <span class="text-[9px] text-slate-500 uppercase font-semibold block leading-none">Loket Teller Mandiri</span>
+            <span id="statusText" class="font-black text-xs text-mandiriBlue">BUKA</span>
+          </div>
+          <button onclick="showJadwalModal()" class="ml-1 text-mandiriBlue hover:text-blue-800 transition p-1" title="Lihat Jam Operasional Loket">
+            <i class="fas fa-circle-info text-sm"></i>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- HEADER UTAMA -->
+  <header class="max-w-5xl mx-auto w-full pt-4 pb-3 px-4 text-center">
+    <div class="inline-flex items-center gap-2 bg-blue-100 border border-blue-300 px-3.5 py-1 rounded-full text-xs font-bold text-mandiriBlue shadow-sm mb-3 glowing-badge">
+      <i class="fas fa-cloud-arrow-up text-mandiriGold"></i> Sinkronisasi Multi-Gadget Otomatis Cloud Google Drive
+    </div>
+
+    <!-- DERETAN LOGO RESMI -->
+    <div class="flex flex-wrap items-center justify-center gap-2 sm:gap-4 py-1">
+      <div class="h-14 sm:h-16 px-2.5 py-1.5 bg-white rounded-2xl shadow-md border-2 border-sky-200 flex items-center justify-center transition transform hover:scale-105" title="Kementerian Agama RI">
+        <img src="https://cms2023.kemenag.go.id/storage/files/shares/Logo/Kementerian_Agama_new_logo%20(2).png" alt="Logo Kemenag" class="h-full w-auto object-contain max-w-[48px] sm:max-w-[56px]" onerror="this.onerror=null; this.src='https://upload.wikimedia.org/wikipedia/commons/9/9a/Kementerian_Agama_Republik_Indonesia_logo.png';">
+      </div>
+
+      <div class="h-16 sm:h-20 px-3 py-1.5 bg-white rounded-2xl shadow-xl shadow-blue-200/80 border-2 border-mandiriBlue flex items-center justify-center transition transform hover:scale-105" title="MAN Kota Blitar Resmi">
+        <img src="https://mankotablitar.sch.id/wp-content/themes/man-kota-blitar/assets/images/logo-man-kota-blitar.png" alt="Logo MAN Kota Blitar" class="h-full w-auto object-contain max-w-[65px] sm:max-w-[76px]" onerror="this.onerror=null; this.src='https://upload.wikimedia.org/wikipedia/commons/9/9a/Kementerian_Agama_Republik_Indonesia_logo.png';">
+      </div>
+
+      <div class="h-14 sm:h-16 px-3 py-1 bg-white rounded-2xl shadow-md border-2 border-emerald-400 flex items-center justify-center transition transform hover:scale-105" title="Komite MAN Kota Blitar">
+        <div class="flex items-center gap-1.5">
+          <div class="w-8 h-8 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-inner font-black text-xs">
+            <i class="fas fa-users-rectangle"></i>
+          </div>
+          <div class="text-left leading-none pr-0.5">
+            <span class="block text-[9px] font-black text-emerald-950 uppercase">KOMITE</span>
+            <span class="block text-[11px] font-black text-emerald-700 tracking-wider">MADRASAH</span>
+            <span class="block text-[8px] font-bold text-slate-500">MAN KOTA BLITAR</span>
+          </div>
+        </div>
+      </div>
+
+      <a href="https://www.bankmandiri.co.id" target="_blank" rel="noopener noreferrer" class="h-14 sm:h-16 px-3.5 py-1.5 bg-white rounded-2xl shadow-xl shadow-amber-200/60 border-2 border-mandiriGold flex items-center justify-center transition transform hover:scale-105" title="PT Bank Mandiri (Persero) Tbk">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/a/ad/Bank_Mandiri_logo_2016.svg" alt="Logo Resmi Bank Mandiri" class="h-full w-auto object-contain max-w-[95px] sm:max-w-[125px]">
+      </a>
+    </div>
+
+    <h1 class="text-2xl sm:text-3xl font-black tracking-wide text-mandiriBlue uppercase mt-3">LOKET PEMBAYARAN KOMITE</h1>
+    <p class="text-xs sm:text-sm text-slate-700 font-semibold">MAN Kota Blitar x Bank Mandiri • Data Registrasi Otomatis Masuk Google Sheets</p>
+    
+    <div class="flex flex-wrap justify-center items-center gap-3 text-xs text-slate-600 font-medium mt-1">
+      <span><i class="fas fa-location-dot text-rose-500 mr-1"></i>Ruang Loket Komite - Kampus MAN Kota Blitar</span>
+      <span>•</span>
+      <a href="https://www.bankmandiri.co.id" target="_blank" rel="noopener noreferrer" class="text-mandiriBlue hover:text-blue-900 underline transition flex items-center gap-1 font-bold">
+        <i class="fas fa-globe text-mandiriGold"></i> www.bankmandiri.co.id
+      </a>
+    </div>
+
+    <!-- Navigation Menu Utama -->
+    <nav aria-label="Menu Utama" class="mt-5 flex flex-wrap justify-center gap-2">
+      <button onclick="switchView('tamu')" id="navTamu" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-mandiriBlue text-white shadow-md border border-blue-900 transition flex items-center gap-1.5">
+        <i class="fas fa-user-pen text-mandiriGold"></i> Form Tamu & Antrian
+      </button>
+      <button onclick="switchView('display')" id="navDisplay" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white text-mandiriBlue hover:bg-blue-50 border-2 border-blue-200 transition flex items-center gap-1.5 shadow-sm">
+        <i class="fas fa-tv text-blue-600"></i> Monitor TV Panggilan
+      </button>
+      <button onclick="switchView('survey')" id="navSurvey" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white text-mandiriBlue hover:bg-blue-50 border-2 border-blue-200 transition flex items-center gap-1.5 shadow-sm">
+        <i class="fas fa-star text-amber-500"></i> Survei Layanan
+      </button>
+      <button onclick="showQrModal()" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white text-mandiriBlue hover:bg-blue-50 border-2 border-blue-200 transition flex items-center gap-1.5 shadow-sm">
+        <i class="fas fa-qrcode text-mandiriBlue"></i> QR Meja Pelayanan
+      </button>
+      <button onclick="salinLinkWaliKelas()" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border-2 border-emerald-300 transition flex items-center gap-1.5 shadow-sm" title="Salin Link Share WhatsApp">
+        <i class="fab fa-whatsapp text-emerald-600"></i> Share WhatsApp
+      </button>
+      <button onclick="switchView('admin')" id="navAdmin" class="px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white text-slate-700 hover:bg-blue-50 border-2 border-blue-200 transition flex items-center gap-1.5 shadow-sm">
+        <i class="fas fa-lock text-mandiriGold"></i> Admin Komite
+      </button>
+    </nav>
+  </header>
+
+  <!-- ================= KONTEN UTAMA ================= -->
+  <main class="max-w-5xl mx-auto w-full px-4 mb-8 flex-grow">
+    
+    <!-- 1. FORM APLIKASI TAMU -->
+    <div id="viewTamu" class="max-w-2xl mx-auto bg-white/95 backdrop-blur-md border-2 border-blue-200 rounded-3xl p-6 sm:p-8 shadow-glow-blue relative">
+      <div id="badgeAksesLangsung" class="mb-4 p-3.5 bg-gradient-to-r from-blue-50 to-emerald-50 border-2 border-blue-300 rounded-2xl flex items-center justify-between text-xs font-bold text-mandiriBlue shadow-xs">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-xl bg-mandiriBlue text-white flex items-center justify-center shrink-0">
+            <i class="fas fa-file-excel text-emerald-400 text-sm"></i>
+          </div>
+          <div>
+            <p class="text-[10px] uppercase text-emerald-700 font-extrabold leading-none">Database Cloud Realtime Aktif</p>
+            <p class="text-mandiriBlue font-black text-xs mt-0.5">Isi formulir untuk mendapatkan nomor antrian & otomatis tersimpan di Google Sheets</p>
+          </div>
+        </div>
+        <span class="text-[10px] bg-emerald-600 text-white px-2.5 py-1 rounded-lg font-bold">Terverifikasi</span>
+      </div>
+
+      <div class="border-b border-blue-100 pb-4 mb-5">
+        <h2 class="text-xl font-black text-mandiriBlue flex items-center gap-2">
+          <i class="fas fa-clipboard-user text-mandiriGold"></i> Formulir Kedatangan Tamu & Wali Murid
+        </h2>
+        <p class="text-xs text-slate-500 mt-1">Data Anda otomatis tersimpan di Google Spreadsheet Admin Komite.</p>
+      </div>
+
+      <form id="formAntrianKomite" onsubmit="ambilNomorAntrian(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-800 uppercase mb-1">
+            Kategori Pengunjung / Asal Tamu <span class="text-rose-500">*</span>
+          </label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-blue-600 pointer-events-none"><i class="fas fa-users-viewfinder"></i></span>
+            <select id="kategoriPengunjung" required onchange="toggleFormSiswa()" class="w-full pl-10 pr-3 py-2.5 bg-blue-50/50 border border-blue-200 rounded-xl text-slate-800 text-xs font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-mandiriBlue">
+              <option value="Orang Tua / Wali Murid" selected>Orang Tua / Wali Murid MAN Kota Blitar</option>
+              <option value="Siswa / Siswi Sendiri">Siswa / Siswi Sendiri</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-800 uppercase mb-1">
+              Nama Lengkap Wali / Tamu <span class="text-rose-500">*</span>
+            </label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-blue-600 pointer-events-none"><i class="fas fa-user"></i></span>
+              <input type="text" id="pembayarNama" required placeholder="Contoh: H. Ahmad Subagio, S.E."
+                class="w-full pl-10 pr-3 py-2.5 bg-blue-50/50 border border-blue-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-mandiriBlue text-xs font-medium transition">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-800 uppercase mb-1">
+              No. WhatsApp Aktif <span class="text-rose-500">*</span>
+            </label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-emerald-600 pointer-events-none"><i class="fab fa-whatsapp text-base"></i></span>
+              <input type="tel" id="pembayarWa" required placeholder="081234567890" oninput="formatInputNomor(this)"
+                class="w-full pl-10 pr-3 py-2.5 bg-blue-50/50 border border-blue-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-mandiriBlue text-xs font-medium transition">
+            </div>
+          </div>
+        </div>
+
+        <!-- Bagian Khusus Siswa -->
+        <div id="sectionSiswa" class="space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-800 uppercase mb-1">
+                Nama Lengkap Siswa / Siswi <span class="text-rose-500">*</span>
+              </label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-blue-600 pointer-events-none"><i class="fas fa-graduation-cap"></i></span>
+                <input type="text" id="siswaNama" placeholder="Contoh: Muhammad Rayhan Al-Fatih"
+                  class="w-full pl-10 pr-3 py-2.5 bg-blue-50/50 border border-blue-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-mandiriBlue text-xs font-medium transition">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-800 uppercase mb-1">
+                Kelas Siswa <span class="text-rose-500">*</span>
+              </label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-blue-600 pointer-events-none"><i class="fas fa-chalkboard-user"></i></span>
+                <select id="siswaKelas" class="w-full pl-10 pr-3 py-2.5 bg-blue-50/50 border border-blue-200 rounded-xl text-slate-800 text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-mandiriBlue">
+                  <option value="" disabled selected>-- Pilih Kelas Siswa --</option>
+                  <optgroup label="Kelas X (Fase E)">
+                    <option value="X-A">X - A</option><option value="X-B">X - B</option><option value="X-C">X - C</option>
+                    <option value="X-D">X - D</option><option value="X-E">X - E</option><option value="X-F">X - F</option>
+                    <option value="X-G">X - G</option><option value="X-H">X - H</option><option value="X-I">X - I</option>
+                    <option value="X-J">X - J</option><option value="X-K">X - K</option><option value="X-L">X - L</option>
+                  </optgroup>
+                  <optgroup label="Kelas XI (Fase F)">
+                    <option value="XI-B">XI - B</option><option value="XI-C">XI - C</option><option value="XI-D">XI - D</option>
+                    <option value="XI-E">XI - E</option><option value="XI-F">XI - F</option><option value="XI-G">XI - G</option>
+                    <option value="XI-H">XI - H</option><option value="XI-I">XI - I</option><option value="XI-J">XI - J</option>
+                    <option value="XI-K">XI - K</option><option value="XI-L">XI - L</option>
+                  </optgroup>
+                  <optgroup label="Kelas XII">
+                    <option value="XII C I">XII C I</option><option value="XII A">XII A</option><option value="XII B">XII B</option>
+                    <option value="XII C">XII C</option><option value="XII D">XII D</option><option value="XII E">XII E</option>
+                    <option value="XII F">XII F</option><option value="XII G">XII G</option><option value="XII H">XII H</option>
+                    <option value="XII I">XII I</option><option value="XII J">XII J</option><option value="XII K">XII K</option>
+                  </optgroup>
+                  <option value="Alumni / Mutasi">Alumni / Siswa Pindahan / Mutasi</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-slate-800 uppercase mb-1">
+              NISN / NIS Siswa <span class="text-slate-400 font-normal">(Opsional)</span>
+            </label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-blue-600 pointer-events-none"><i class="fas fa-id-card"></i></span>
+              <input type="text" id="siswaNis" placeholder="Contoh: 0061234567"
+                class="w-full pl-10 pr-3 py-2.5 bg-blue-50/50 border border-blue-200 rounded-xl text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-mandiriBlue text-xs font-medium transition">
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-800 uppercase mb-1">
+            Jenis Pembayaran / Keperluan Komite <span class="text-rose-500">*</span>
+          </label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-blue-600 pointer-events-none"><i class="fas fa-receipt"></i></span>
+            <select id="jenisPembayaran" required class="w-full pl-10 pr-3 py-2.5 bg-blue-50/50 border border-blue-200 rounded-xl text-slate-800 text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-mandiriBlue">
+              <option value="" disabled selected>-- Pilih Jenis Tagihan / Keperluan --</option>
+              <option value="PEMBAYARAN INFAQ">PEMBAYARAN INFAQ</option>
+              <option value="PEMBAYARAN JARIYAH">PEMBAYARAN JARIYAH</option>
+              <option value="PEMBAYARAN TABUNGAN">PEMBAYARAN TABUNGAN</option>
+              <option value="PENANGGUHAN PEMBAYARAN">PENANGGUHAN PEMBAYARAN</option>
+              <option value="Pelunasan Tunggakan Komite">Pelunasan Tunggakan Komite</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-800 uppercase mb-1">
+            Metode Transaksi Bank Mandiri <span class="text-rose-500">*</span>
+          </label>
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-mandiriGold pointer-events-none"><i class="fas fa-wallet text-sm"></i></span>
+            <select id="metodeBayar" required class="w-full pl-10 pr-3 py-2.5 bg-blue-50/50 border border-blue-200 rounded-xl text-slate-800 text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-mandiriBlue">
+              <option value="Loket Teller Mandiri (Tunai)">Loket Teller Mandiri di Madrasah (Uang Tunai)</option>
+              <option value="Mesin EDC Mandiri (Kartu Debit)">Mesin EDC Mandiri di Loket (Debit Mandiri / Bank Lain)</option>
+              <option value="QRIS Bank Mandiri / Livin'">QRIS Bank Mandiri (Scan via Livin' / E-Wallet)</option>
+              <option value="Virtual Account (VA) Bank Mandiri">Virtual Account (VA) Mandiri / ATM / Livin' by Mandiri</option>
+              <option value="Konsultasi Petugas Loket">Konsultasi Langsung dengan Petugas Komite</option>
+            </select>
+          </div>
+        </div>
+
+        <button type="submit" id="btnAmbilAntrian" class="w-full mt-4 py-3.5 bg-gradient-to-r from-mandiriBlue via-blue-800 to-mandiriBlue hover:from-blue-900 hover:to-mandiriBlue text-white font-extrabold text-sm rounded-xl shadow-lg uppercase tracking-wider transition flex items-center justify-center gap-2">
+          <span>Kirim Data Registrasi & Dapatkan Antrian</span>
+          <i class="fas fa-ticket-simple text-mandiriGold text-base"></i>
+        </button>
+      </form>
+    </div>
+
+    <!-- 2. LAYAR MONITOR DISPLAY PANGGILAN -->
+    <div id="viewDisplay" class="hidden space-y-6">
+      <div class="bg-gradient-to-r from-mandiriBlue via-blue-900 to-mandiriBlue text-white rounded-3xl p-5 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-4 border-2 border-mandiriGold">
+        <div class="flex items-center gap-3">
+          <div class="w-14 h-14 bg-white p-2 rounded-2xl flex items-center justify-center shrink-0 shadow-md">
+            <img src="https://mankotablitar.sch.id/wp-content/themes/man-kota-blitar/assets/images/logo-man-kota-blitar.png" alt="MAN Kota Blitar" class="h-full object-contain">
+          </div>
+          <div>
+            <h2 class="text-xl font-black uppercase tracking-wide text-white">MONITOR PANGGILAN ANTRIAN</h2>
+            <p class="text-xs text-mandiriGold font-bold">LOKET PEMBAYARAN KOMITE MAN KOTA BLITAR x BANK MANDIRI</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-4">
+          <div class="h-10 bg-white px-3 py-1 rounded-xl flex items-center justify-center shadow-md">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/a/ad/Bank_Mandiri_logo_2016.svg" alt="Bank Mandiri" class="h-full w-auto object-contain max-w-[85px]">
+          </div>
+          <div class="text-right">
+            <div id="displayClock" class="text-2xl font-mono font-black text-amber-300">00:00:00 WIB</div>
+            <span class="text-[11px] text-blue-200">Terhubung Cloud Spreadsheet Realtime</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="md:col-span-2 bg-white rounded-3xl p-6 sm:p-8 border-4 border-mandiriBlue shadow-2xl text-center relative overflow-hidden">
+          <div class="absolute top-0 left-0 right-0 bg-mandiriBlue text-white py-2 text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 blink-status"></span>
+            NOMOR ANTRIAN SEDANG DILAYANI
+          </div>
+
+          <div class="my-6 pt-4">
+            <p class="text-xs font-extrabold uppercase text-slate-500 mb-1">Nomor Panggilan</p>
+            <div id="displayNomorAktif" class="text-7xl sm:text-8xl font-mono font-black text-mandiriBlue tracking-tight drop-shadow-md">
+              KM-000
+            </div>
+            
+            <div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-2xl inline-block max-w-md w-full">
+              <p class="text-xs font-bold text-slate-500">Nama Siswa / Pembayar:</p>
+              <p id="displayNamaAktif" class="text-base font-black text-mandiriBlue mt-0.5">- Belum Ada Panggilan -</p>
+              <p id="displayKeperluanAktif" class="text-xs font-semibold text-emerald-800 mt-1">Silakan Menunggu Panggilan</p>
+            </div>
+          </div>
+
+          <div class="pt-4 border-t border-slate-200 flex flex-wrap items-center justify-around gap-2 text-xs font-bold text-slate-700">
+            <div><i class="fas fa-door-open text-blue-600 mr-1"></i> Loket: <span class="font-black text-mandiriBlue">Loket Teller Mandiri 1</span></div>
+            <div><i class="fas fa-building-columns text-mandiriGold mr-1"></i> Petugas: <span class="font-black text-slate-800">Teller Bank Mandiri</span></div>
+          </div>
+        </div>
+
+        <div class="space-y-4">
+          <div class="bg-gradient-to-br from-amber-500 to-amber-600 text-white p-5 rounded-3xl shadow-xl text-center">
+            <p class="text-xs font-bold uppercase tracking-wider text-amber-100">Sisa Antrian Menunggu</p>
+            <p id="displaySisaAntrian" class="text-5xl font-mono font-black mt-1">0</p>
+            <p class="text-[11px] text-amber-100 mt-1">Orang Dalam Antrian</p>
+          </div>
+
+          <div class="bg-white p-5 rounded-3xl border-2 border-blue-200 shadow-md">
+            <h3 class="text-xs font-black uppercase text-mandiriBlue mb-3 flex items-center justify-between border-b pb-2">
+              <span>Daftar Menunggu Selanjutnya</span>
+              <i class="fas fa-list-ol text-blue-500"></i>
+            </h3>
+            <ul id="listMenungguDisplay" class="space-y-2 text-xs">
+              <li class="p-2 bg-slate-50 text-slate-400 text-center rounded-xl font-medium">Belum ada antrian menunggu</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. SURVEI KEPUASAN (SKM) -->
+    <div id="viewSurvey" class="hidden max-w-2xl mx-auto bg-white/95 backdrop-blur-md border-2 border-blue-200 rounded-3xl p-6 sm:p-8 shadow-glow-blue">
+      <div class="border-b border-blue-100 pb-4 mb-5">
+        <div class="inline-block px-3 py-1 bg-amber-100 text-amber-900 text-[11px] font-extrabold rounded-lg border border-amber-300 mb-2">
+          <i class="fas fa-star mr-1 text-mandiriGold"></i> Survei Kepuasan Layanan Pembayaran Komite & Mandiri
+        </div>
+        <h2 class="text-xl font-black text-mandiriBlue flex items-center gap-2">
+          <i class="fas fa-clipboard-check text-emerald-600"></i> Evaluasi Layanan Komite Madrasah
+        </h2>
+        <p class="text-xs text-slate-500 mt-1">Penilaian Anda otomatis direkap ke Google Spreadsheet komite.</p>
+      </div>
+
+      <form id="formSurveyKomite" onsubmit="simpanSurveyKomite(event)" class="space-y-4">
+        <div class="p-4 bg-blue-50/70 rounded-2xl border border-blue-200 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-700 mb-1">Nama Wali Murid <span class="text-rose-500">*</span></label>
+            <input type="text" id="surveyNama" required placeholder="Nama Anda" class="w-full px-3 py-2 bg-white border border-blue-200 rounded-lg text-xs font-medium">
+          </div>
+          <div>
+            <label class="block text-[11px] font-bold text-slate-700 mb-1">No. WhatsApp <span class="text-rose-500">*</span></label>
+            <input type="tel" id="surveyWa" required placeholder="08xxxxxxxxxx" oninput="formatInputNomor(this)" class="w-full px-3 py-2 bg-white border border-blue-200 rounded-lg text-xs font-medium">
+          </div>
+        </div>
+
+        <div id="containerUnsurBintang" class="space-y-3"></div>
+
+        <div class="p-3.5 bg-amber-50 rounded-xl border border-amber-300">
+          <p class="font-bold text-amber-950 text-xs mb-1"><i class="fas fa-shield-halved mr-1 text-amber-600"></i> Penilaian Transparansi & Bebas Pungli Komite:</p>
+          <div class="grid grid-cols-2 gap-2 text-center text-xs font-bold mt-2">
+            <label><input type="radio" name="ziAntiKorupsi" value="Transparan & Sesuai Ketentuan" required checked class="peer sr-only"><span class="block py-2 rounded-lg bg-white border border-emerald-400 text-emerald-800 peer-checked:bg-emerald-600 peer-checked:text-white cursor-pointer shadow-sm">100% TRANSPARAN (BEBAS PUNGLI)</span></label>
+            <label><input type="radio" name="ziAntiKorupsi" value="Kurang Transparan" class="peer sr-only"><span class="block py-2 rounded-lg bg-white border border-rose-400 text-rose-800 peer-checked:bg-rose-600 peer-checked:text-white cursor-pointer shadow-sm">KURANG TRANSPARAN</span></label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-800 uppercase mb-1">Kritik, Saran, atau Masukan:</label>
+          <textarea id="surveySaran" rows="2" placeholder="Tulis masukan Anda untuk peningkatan sistem antrian & layanan loket..." class="w-full px-3 py-2 bg-blue-50/50 border border-blue-200 rounded-xl text-xs font-medium"></textarea>
+        </div>
+
+        <button type="submit" id="btnSubmitSurvey" class="w-full py-3.5 bg-gradient-to-r from-mandiriBlue via-blue-800 to-mandiriBlue text-white font-extrabold text-sm rounded-xl shadow-lg transition flex items-center justify-center gap-2 uppercase tracking-wider">
+          <span>Kirim Penilaian Kepuasan</span>
+          <i class="fas fa-cloud-arrow-up text-mandiriGold"></i>
+        </button>
+      </form>
+    </div>
+
+    <!-- 4. PANEL ADMIN KOMITE -->
+    <div id="viewAdmin" class="hidden bg-white/95 backdrop-blur-md border-2 border-blue-200 rounded-3xl p-6 sm:p-8 shadow-glow-blue relative">
+      <div id="adminLoginBox" class="max-w-xs mx-auto text-center py-6">
+        <div class="w-14 h-14 bg-blue-100 text-mandiriBlue rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl border-2 border-blue-300 shadow-md">
+          <i class="fas fa-user-shield"></i>
+        </div>
+        <h2 class="text-lg font-black text-mandiriBlue mb-1">Panel Admin Komite</h2>
+        <p class="text-xs text-slate-500 mb-4">Area terbatas khusus petugas komite & teller resmi</p>
+        
+        <form onsubmit="handleAdminLogin(event)" class="space-y-3.5 text-left">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Username Admin</label>
+            <input type="text" id="adminUser" placeholder="Masukkan username" required class="w-full px-3.5 py-2.5 bg-blue-50/60 border border-blue-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-mandiriBlue">
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Password Rahasia</label>
+            <div class="relative">
+              <input type="password" id="adminPass" placeholder="••••••••" required class="w-full pl-3.5 pr-10 py-2.5 bg-blue-50/60 border border-blue-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-mandiriBlue">
+              <button type="button" onclick="togglePasswordVisibility()" class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-mandiriBlue transition">
+                <i class="fas fa-eye" id="eyeIcon"></i>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="w-full mt-2 py-3 bg-mandiriBlue hover:bg-blue-900 text-white font-black rounded-xl text-xs uppercase shadow-md transition flex items-center justify-center gap-2">
+            <i class="fas fa-lock-open text-mandiriGold"></i>
+            <span>Masuk Panel Admin</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Dashboard Petugas Komite -->
+      <div id="adminDashboard" class="hidden">
+        <div class="flex flex-wrap items-center justify-between border-b border-blue-200 pb-4 mb-4 gap-2">
+          <div>
+            <h2 class="text-lg font-black text-mandiriBlue flex items-center gap-2">
+              <i class="fas fa-cash-register text-mandiriGold"></i> Meja Kasir & Admin Komite
+            </h2>
+            <p class="text-xs text-emerald-700 font-bold flex items-center gap-1.5 mt-0.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping"></span> Mengendalikan Panggilan ke Layar TV & Terhubung Realtime ke Google Sheets
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="setGoogleSheetPrompt()" class="px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+              <i class="fas fa-link text-mandiriGold"></i> Atur URL Google Sheets
+            </button>
+            <button onclick="tarikDataDariGoogleSheets(true)" class="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+              <i class="fas fa-arrows-rotate"></i> Refresh Data
+            </button>
+            <button onclick="salinLinkWaliKelas()" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition shadow-sm flex items-center gap-1.5">
+              <i class="fab fa-whatsapp"></i> Share Link
+            </button>
+            <button onclick="logoutAdmin()" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition shadow-sm">
+              Keluar
+            </button>
+          </div>
+        </div>
+
+        <!-- Tombol Aksi Kontrol Antrian -->
+        <div class="bg-gradient-to-r from-blue-50 to-sky-50 border-2 border-blue-300 rounded-2xl p-4 mb-6 shadow-sm">
+          <p class="text-xs font-black uppercase text-mandiriBlue mb-3 flex items-center gap-1.5">
+            <i class="fas fa-bullhorn text-mandiriGold text-base"></i> Kontrol Panggilan Antrian Suara (Terkoneksi ke TV):
+          </p>
+          
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <button onclick="panggilAntrianBerikutnya()" class="py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase rounded-xl shadow-md transition flex items-center justify-center gap-2">
+              <i class="fas fa-volume-high text-base"></i>
+              <span>Panggil Nomor Berikutnya</span>
+            </button>
+
+            <button onclick="panggilUlangAntrian()" class="py-3 px-4 bg-mandiriBlue hover:bg-blue-900 text-white font-black text-xs uppercase rounded-xl shadow-md transition flex items-center justify-center gap-2">
+              <i class="fas fa-rotate text-base"></i>
+              <span>Panggil Ulang Suara</span>
+            </button>
+
+            <button onclick="tandaiSelesaiAntrian()" class="py-3 px-4 bg-sky-600 hover:bg-sky-700 text-white font-black text-xs uppercase rounded-xl shadow-md transition flex items-center justify-center gap-2">
+              <i class="fas fa-check-double text-base"></i>
+              <span>Selesaikan Layanan</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Statistik Transaksi -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5 text-center">
+          <div class="bg-blue-50 p-3 rounded-xl border border-blue-200">
+            <p class="text-[10px] text-blue-900 uppercase font-bold">Total Pendaftar</p>
+            <p id="statTotalAntrian" class="text-2xl font-black text-mandiriBlue">0</p>
+          </div>
+          <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200">
+            <p class="text-[10px] text-emerald-900 uppercase font-bold">Selesai Dilayani</p>
+            <p id="statSelesai" class="text-2xl font-black text-emerald-800">0</p>
+          </div>
+          <div class="bg-amber-50 p-3 rounded-xl border border-amber-200">
+            <p class="text-[10px] text-amber-900 uppercase font-bold">Sedang Menunggu</p>
+            <p id="statMenunggu" class="text-2xl font-black text-amber-700">0</p>
+          </div>
+          <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+            <p class="text-[10px] text-slate-800 uppercase font-bold">Status Cloud</p>
+            <p id="statCloudStatus" class="text-xs font-black text-emerald-600 mt-2">Sinkron</p>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap gap-2 mb-4">
+          <button onclick="exportAntrianCSV()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+            <i class="fas fa-file-excel"></i> Unduh Rekap CSV / Excel
+          </button>
+        </div>
+
+        <!-- Tabel Antrian -->
+        <h3 class="text-xs font-black text-mandiriBlue uppercase mb-2 flex items-center gap-1.5">
+          <i class="fas fa-table-list text-mandiriGold"></i> Data Antrian Masuk dari Google Sheets
+        </h3>
+        <div class="overflow-x-auto rounded-xl border border-blue-200 max-h-80 shadow-sm">
+          <table class="w-full text-left text-xs text-slate-700">
+            <thead class="bg-blue-100/90 text-mandiriBlue uppercase text-[10px] sticky top-0 font-extrabold">
+              <tr>
+                <th class="p-2.5">No. Antrian</th>
+                <th class="p-2.5">Nama Siswa / Tamu</th>
+                <th class="p-2.5">Kategori / WhatsApp</th>
+                <th class="p-2.5">Keperluan Pembayaran</th>
+                <th class="p-2.5">Metode Bayar</th>
+                <th class="p-2.5 text-center">Status</th>
+                <th class="p-2.5 text-center">Aksi</th>
+              </tr>
+            </thead>
+            <tbody id="tabelBodyAntrian" class="divide-y divide-blue-100 bg-white">
+              <tr><td colspan="7" class="p-4 text-center text-slate-400">Menghubungkan ke database Google Sheets...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL JADWAL -->
+  <div id="modalJadwal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white border-2 border-mandiriBlue rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl relative">
+      <button onclick="closeJadwalModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-700 text-lg"><i class="fas fa-times"></i></button>
+      <div class="w-12 h-12 rounded-xl bg-blue-100 text-mandiriBlue flex items-center justify-center mx-auto mb-2 text-xl border border-blue-300">
+        <i class="fas fa-calendar-check"></i>
+      </div>
+      <h3 class="text-base font-black text-mandiriBlue uppercase">Jam Layanan Loket Mandiri</h3>
+      <p class="text-[11px] text-slate-600 font-semibold mb-3">MAN Kota Blitar</p>
+      <div class="text-xs text-left space-y-2 bg-blue-50 p-3.5 rounded-xl border border-blue-200 font-medium">
+        <div class="flex justify-between border-b border-blue-200 pb-1"><span>Senin – Kamis:</span><b class="font-mono text-mandiriBlue">08.00 – 14.30 WIB</b></div>
+        <div class="flex justify-between border-b border-blue-200 pb-1"><span>Jumat:</span><b class="font-mono text-mandiriBlue">08.00 – 11.30 WIB</b></div>
+        <div class="flex justify-between text-rose-600 font-bold"><span>Sabtu – Minggu:</span><span class="font-mono">TUTUP / LIBUR</span></div>
+      </div>
+      <button onclick="closeJadwalModal()" class="mt-4 w-full py-2 bg-mandiriBlue hover:bg-blue-900 text-white rounded-xl font-bold text-xs shadow-md">Tutup</button>
+    </div>
+  </div>
+
+  <!-- ================= MODAL QR CODE AKRILIK (DIPERBARUI DENGAN SMART SYNC) ================= -->
+  <div id="modalQR" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white border-2 border-mandiriBlue rounded-3xl p-6 max-w-md w-full text-center shadow-2xl relative">
+      <button onclick="closeQrModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-700 text-lg"><i class="fas fa-times"></i></button>
+      
+      <div class="w-12 h-12 bg-blue-100 text-mandiriBlue rounded-2xl flex items-center justify-center mx-auto mb-2 text-xl border border-blue-300">
+        <i class="fas fa-qrcode"></i>
+      </div>
+      <h3 class="text-base font-black text-mandiriBlue uppercase">QR Meja Pelayanan Komite</h3>
+      <p class="text-[11px] text-slate-600 font-semibold">Tamu scan QR di HP & data otomatis tersambung ke Google Sheets</p>
+      
+      <div class="mt-3 p-3 bg-white rounded-2xl inline-block border-2 border-blue-300 shadow-inner">
+        <img id="qrImage" src="" alt="QR Antrian" class="w-48 h-48 mx-auto object-contain">
+      </div>
+
+      <!-- STATUS INDIKATOR PENYIMPANAN CLOUD DI MODAL QR -->
+      <div id="qrDatabaseStatus" class="mt-2.5 p-2 rounded-xl text-[11px] font-bold border flex items-center justify-between">
+        <div class="flex items-center gap-1.5 text-left">
+          <i id="qrStatusIcon" class="fas fa-circle-check text-emerald-600 text-sm"></i>
+          <span id="qrStatusMsg" class="text-slate-700">Database Siap: HP Tamu Otomatis Tersambung</span>
+        </div>
+        <button onclick="setGoogleSheetPrompt()" class="text-blue-700 underline text-[10px] ml-2 shrink-0">Ubah URL</button>
+      </div>
+
+      <div class="mt-2.5 p-2.5 bg-blue-50/70 rounded-xl border border-blue-200 text-left">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[10px] font-black uppercase text-mandiriBlue">Link Website Aplikasi Tamu:</span>
+          <button onclick="editTargetUrlPrompt()" class="text-[10px] text-blue-700 hover:text-blue-900 underline font-bold">
+            <i class="fas fa-pen-to-square"></i> Ubah Link Web
+          </button>
+        </div>
+        <div class="flex items-center gap-1.5 text-[11px] font-mono font-bold text-mandiriBlue bg-white p-2 rounded-lg border border-blue-300 break-all shadow-xs">
+          <i class="fas fa-link text-mandiriGold text-xs shrink-0"></i>
+          <span id="displayTargetUrl">Memuat link...</span>
+        </div>
+      </div>
+      
+      <div class="mt-4 pt-3 border-t border-slate-200 flex flex-col gap-2">
+        <button onclick="cetakStandMeja()" class="w-full py-2.5 bg-mandiriBlue hover:bg-blue-900 text-xs font-bold text-white rounded-xl shadow-md flex items-center justify-center gap-1.5 transition">
+          <i class="fas fa-print"></i> Cetak Standing Akrilik Meja
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DIALOG TIKET ANTRIAN -->
+  <div id="modalTiketAntrian" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white border-2 border-mandiriBlue rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl">
+      <div class="w-14 h-14 bg-blue-100 text-mandiriBlue rounded-full flex items-center justify-center mx-auto mb-2 text-3xl">
+        <i class="fas fa-ticket-simple text-mandiriGold"></i>
+      </div>
+      <h3 class="text-lg font-black text-mandiriBlue">NOMOR ANTRIAN ANDA</h3>
+      <p class="text-xs text-slate-500 mt-0.5 mb-3">Tersimpan di Sistem & Google Spreadsheet Komite</p>
+      
+      <div class="bg-gradient-to-br from-blue-50 to-sky-100 p-4 rounded-2xl border-2 border-blue-300 mb-3 text-center shadow-sm">
+        <span class="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Nomor Antrian Loket:</span>
+        <div id="popNomorAntrian" class="text-5xl font-mono font-black text-mandiriBlue my-1">KM-001</div>
+        <p class="text-xs font-black text-slate-800" id="popNamaSiswa">Nama: -</p>
+        <p class="text-[11px] font-bold text-blue-900" id="popKelasSiswa">Kelas / Kategori: -</p>
+        <p class="text-[10px] text-emerald-800 font-bold mt-1" id="popKeperluan">Keperluan: -</p>
+      </div>
+
+      <div class="space-y-2">
+        <a id="btnKirimWA" href="#" target="_blank" class="w-full py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-xs font-extrabold rounded-xl shadow-md transition flex items-center justify-center gap-2">
+          <i class="fab fa-whatsapp text-lg"></i>
+          <span>Simpan Tiket ke WhatsApp</span>
+        </a>
+
+        <button onclick="cetakTiketFisik()" class="w-full py-2.5 bg-gradient-to-r from-mandiriBlue to-blue-800 hover:from-blue-900 hover:to-blue-950 text-white text-xs font-bold rounded-xl shadow-md transition flex items-center justify-center gap-2">
+          <i class="fas fa-print text-sm"></i>
+          <span>Cetak Tiket / Struk (Print / PDF)</span>
+        </button>
+      </div>
+
+      <div class="mt-4 pt-3 border-t border-slate-200">
+        <button onclick="tutupTiketLanjutMonitor()" class="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition">
+          Lihat Layar Panggilan Monitor
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AREA PRINT: STANDING MEJA -->
+  <div id="printAreaStandMeja" class="hidden p-8 bg-white text-center font-sans">
+    <div class="max-w-md mx-auto border-4 border-mandiriBlue rounded-3xl p-6 shadow-none">
+      <div class="flex items-center justify-center gap-4 mb-3">
+        <img src="https://mankotablitar.sch.id/wp-content/themes/man-kota-blitar/assets/images/logo-man-kota-blitar.png" class="h-12 object-contain" alt="MAN Kota Blitar">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/a/ad/Bank_Mandiri_logo_2016.svg" class="h-10 object-contain" alt="Logo Resmi Bank Mandiri">
+      </div>
+      <h2 class="text-xl font-black text-mandiriBlue uppercase leading-tight">ANTRIAN PEMBAYARAN KOMITE</h2>
+      <h3 class="text-base font-black text-slate-800 uppercase">MAN KOTA BLITAR</h3>
+      <p class="text-[11px] text-slate-600 font-semibold mb-3">Mitra Perbankan: PT Bank Mandiri (Persero) Tbk</p>
+      <div class="p-3 bg-white inline-block border-2 border-mandiriBlue rounded-2xl mb-2">
+        <img id="qrPrintImage" src="" class="w-56 h-56 mx-auto object-contain" alt="QR Antrian">
+      </div>
+      <p class="text-sm font-black text-mandiriBlue uppercase tracking-wide">SILAKAN SCAN UNTUK MENGAMBIL ANTRIAN</p>
+      <p class="text-xs text-slate-600 mt-1">Arahkan kamera HP untuk mengisi form kedatangan & memantau antrian.</p>
+      <p id="printTargetUrl" class="text-xs font-mono font-bold text-mandiriBlue mt-2 underline"></p>
+    </div>
+  </div>
+
+  <!-- AREA PRINT: STRUK TIKET -->
+  <div id="printTiketAntrian" class="hidden p-4 bg-white text-slate-900 font-sans border-2 border-slate-300 rounded-xl">
+    <div class="text-center border-b-2 border-dashed border-slate-400 pb-2 mb-2">
+      <h3 class="text-xs font-black uppercase text-slate-900 leading-tight">MAN KOTA BLITAR</h3>
+      <h4 class="text-xs font-bold uppercase text-mandiriBlue leading-tight">LOKET KOMITE x BANK MANDIRI</h4>
+      <p class="text-[9px] text-slate-500">Jl. Jati No. 78 Sukorejo, Kota Blitar</p>
+    </div>
+    <div class="text-center my-2">
+      <p class="text-[10px] font-bold uppercase tracking-wider text-slate-600">NOMOR ANTRIAN ANDA</p>
+      <p id="strukNoAntrian" class="text-4xl font-mono font-black text-mandiriBlue my-1">KM-001</p>
+      <p id="strukWaktuAntrian" class="text-[9px] text-slate-500">00/00/0000 00:00 WIB</p>
+    </div>
+    <table class="w-full text-[11px] text-left my-2 border-t border-b border-dashed border-slate-400 py-1">
+      <tr><td class="font-bold text-slate-600 w-24">Nama Siswa / Tamu</td><td>: <span id="strukNamaSiswa" class="font-bold">-</span></td></tr>
+      <tr><td class="font-bold text-slate-600">Kelas / Kategori</td><td>: <span id="strukKelas">-</span></td></tr>
+      <tr><td class="font-bold text-slate-600">Wali / Pengunjung</td><td>: <span id="strukWali">-</span></td></tr>
+      <tr><td class="font-bold text-slate-600">Keperluan</td><td>: <span id="strukKeperluan">-</span></td></tr>
+      <tr><td class="font-bold text-slate-600">Metode Bayar</td><td>: <span id="strukMetode">-</span></td></tr>
+    </table>
+    <div class="text-center text-[10px] text-slate-600 my-2">
+      <p>Silakan menunggu panggilan suara nomor antrian Anda di ruang tunggu loket Bank Mandiri.</p>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="bg-white/85 border-t border-blue-200 py-4 px-4 text-center text-xs text-slate-600 mt-auto">
+    <p class="font-bold text-mandiriBlue">SISTEM ANTRIAN DIGITAL KOMITE MAN KOTA BLITAR • MITRA PERBANKAN RESMI BANK MANDIRI</p>
+  </footer>
+
+  <!-- ================= JAVASCRIPT REALTIME & SMART QR SYNC ================= -->
+  <script>
+    // -------------------------------------------------------------------------
+    // 1. PENGATURAN URL DATABASE (BISA DI-HARDCODE ATAU DIATUR DARI MENU ADMIN)
+    // -------------------------------------------------------------------------
+    const DEFAULT_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwYOUR_SCRIPT_ID_HERE/exec"; 
+    const DEFAULT_KOMITE_DOMAIN   = "https://komite-man-kota-blitar.vercel.app";
+
+    // Cek apakah HP Tamu membuka halaman dari scan QR yang membawa parameter URL Google Sheets
+    const urlParams = new URLSearchParams(window.location.search);
+    const apiFromQr = urlParams.get('apiUrl') || urlParams.get('api');
+    if (apiFromQr && apiFromQr.startsWith("http")) {
+      localStorage.setItem("komite_google_script_url", decodeURIComponent(apiFromQr));
+    }
+
+    // Ambil Endpoint Aktif
+    function getGoogleScriptUrl() {
+      const saved = localStorage.getItem("komite_google_script_url");
+      if (saved && saved.trim() !== "" && !saved.includes("YOUR_SCRIPT_ID_HERE")) {
+        return saved.trim();
+      }
+      return DEFAULT_APPS_SCRIPT_URL;
+    }
+
+    function isDatabaseConfigured() {
+      const url = getGoogleScriptUrl();
+      return url && url.startsWith("http") && !url.includes("YOUR_SCRIPT_ID_HERE");
+    }
+
+    function getCleanKomiteUrl() {
+      const savedCustom = localStorage.getItem("komite_custom_target_url");
+      if (savedCustom && savedCustom.trim() !== "") return savedCustom.trim();
+      if (window.location.protocol === "http:" || window.location.protocol === "https:") {
+        if (window.location.origin && window.location.origin !== "null") {
+          return window.location.origin + window.location.pathname;
+        }
+      }
+      return DEFAULT_KOMITE_DOMAIN;
+    }
+
+    const ADMIN_CRED = {
+      users: ["admin", "komite"],
+      pass: "komite78"
+    };
+
+    let antrianList = [];
+    let nomorPanggilanAktif = null;
+    let surveyList = [];
+    let lastKnownPanggilan = null;
+
+    const UNSUR_SURVEY_DATA = [
+      { id: "u1", judul: "1. Kecepatan dan Ketepatan Pelayanan Loket", desc: "Petugas teller melayani dengan sigap & tepat" },
+      { id: "u2", judul: "2. Kemudahan Prosedur & Transaksi Bank Mandiri", desc: "Tersedia pilihan Tunai, EDC, Livin', dan QRIS" },
+      { id: "u3", judul: "3. Transparansi & Kejelasan Informasi Biaya Komite", desc: "Rincian dana komite jelas & bebas pungutan liar" },
+      { id: "u4", judul: "4. Kesopanan, Keramahan & Kenyamanan Ruang", desc: "Petugas ramah dan ruang tunggu loket nyaman" }
+    ];
+    const nilaiBintangUnsur = { u1: 5, u2: 5, u3: 5, u4: 5 };
+
+    document.addEventListener("DOMContentLoaded", () => {
+      startRealtimeClock();
+      generateQrStand();
+      renderFormUnsurBintang();
+
+      const menu = urlParams.get('menu');
+      if (menu === 'display') switchView('display');
+      else if (menu === 'survey') switchView('survey');
+      else {
+        switchView('tamu');
+        setTimeout(() => {
+          const el = document.getElementById("pembayarNama");
+          if (el) el.focus();
+        }, 300);
+      }
+
+      tarikDataDariGoogleSheets();
+      // Polling sinkronisasi otomatis tiap 3.5 detik
+      setInterval(tarikDataDariGoogleSheets, 3500);
+    });
+
+    // =========================================================================
+    // 2. GENERATOR SMART QR CODE (MENYATUKAN LINK WEB + LINK GOOGLE SHEETS)
+    // =========================================================================
+    function generateQrStand() {
+      const baseUrl = getCleanKomiteUrl().split('?')[0];
+      let targetUrl = `${baseUrl}?menu=tamu`;
+
+      // JIKA DATABASE SUDAH DISIAPKAN, QR CODE AKAN MEMBAWA PARAMETER apiUrl
+      const currentScriptUrl = getGoogleScriptUrl();
+      const ready = isDatabaseConfigured();
+
+      if (ready) {
+        targetUrl += `&apiUrl=${encodeURIComponent(currentScriptUrl)}`;
+      }
+
+      const qrApi = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&ecc=M&data=${encodeURIComponent(targetUrl)}`;
+      
+      const elImg = document.getElementById("qrImage");
+      const elPrintImg = document.getElementById("qrPrintImage");
+      const elDisplay = document.getElementById("displayTargetUrl");
+      const elPrintUrl = document.getElementById("printTargetUrl");
+
+      if (elImg) elImg.src = qrApi;
+      if (elPrintImg) elPrintImg.src = qrApi;
+      if (elDisplay) elDisplay.textContent = targetUrl;
+      if (elPrintUrl) elPrintUrl.textContent = baseUrl;
+
+      // Update badge status di dalam modal QR
+      const statusBox = document.getElementById("qrDatabaseStatus");
+      const statusIcon = document.getElementById("qrStatusIcon");
+      const statusMsg = document.getElementById("qrStatusMsg");
+
+      if (statusBox && statusIcon && statusMsg) {
+        if (ready) {
+          statusBox.className = "mt-2.5 p-2 rounded-xl text-[11px] font-bold border flex items-center justify-between bg-emerald-50 text-emerald-800 border-emerald-300";
+          statusIcon.className = "fas fa-circle-check text-emerald-600 text-sm";
+          statusMsg.textContent = "Database Siap: HP Tamu Otomatis Tersambung";
+        } else {
+          statusBox.className = "mt-2.5 p-2 rounded-xl text-[11px] font-bold border flex items-center justify-between bg-rose-50 text-rose-800 border-rose-300";
+          statusIcon.className = "fas fa-triangle-exclamation text-rose-600 text-sm";
+          statusMsg.textContent = "Penting: URL Google Apps Script Belum Terpasang!";
+        }
+      }
+    }
+
+    function editTargetUrlPrompt() {
+      const current = getCleanKomiteUrl().split('?')[0];
+      const input = prompt("Masukkan Alamat Web Aplikasi Komite Anda:\n(Contoh: https://komite-man-kota-blitar.vercel.app)", current);
+      if (input !== null && input.trim() !== "") {
+        let clean = input.trim();
+        if (!clean.startsWith("http://") && !clean.startsWith("https://")) clean = "https://" + clean;
+        localStorage.setItem("komite_custom_target_url", clean);
+        generateQrStand();
+        showToast("Link Aplikasi Tamu diperbarui!", "success");
+      }
+    }
+
+    function setGoogleSheetPrompt() {
+      const current = getGoogleScriptUrl();
+      const input = prompt("Masukkan Web App URL Google Apps Script Anda:\n(Contoh: https://script.google.com/macros/s/AKfycb.../exec)", isDatabaseConfigured() ? current : "");
+      if (input !== null && input.trim() !== "") {
+        localStorage.setItem("komite_google_script_url", input.trim());
+        generateQrStand();
+        showToast("URL Google Sheets berhasil disimpan & terhubung!", "success");
+        tarikDataDariGoogleSheets(true);
+      }
+    }
+
+    function salinLinkWaliKelas() {
+      const baseUrl = getCleanKomiteUrl().split('?')[0];
+      let shareUrl = `${baseUrl}?menu=tamu`;
+      if (isDatabaseConfigured()) {
+        shareUrl += `&apiUrl=${encodeURIComponent(getGoogleScriptUrl())}`;
+      }
+
+      const pesanWA = 
+`*PENGUMUMAN LAYANAN KOMITE MADRASAH*
+*MAN KOTA BLITAR x BANK MANDIRI*
+
+Yth. Bapak/Ibu Wali Murid MAN Kota Blitar,
+Silakan ambil nomor antrian loket komite secara online melalui tautan resmi berikut:
+
+👉 ${shareUrl}
+
+Formulir langsung terhubung ke database loket komite secara realtime. Terima kasih!`;
+
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(pesanWA).then(() => showToast("Pesan & Link WhatsApp berhasil disalin!", "success"));
+      } else {
+        window.prompt("Salin teks pesan berikut untuk WhatsApp:", pesanWA);
+      }
+    }
+
+    // =========================================================================
+    // 3. PENGIRIMAN DATA ANTI-BLOKIR BROWSER SELULER (SIMPLE REQUEST)
+    // =========================================================================
+    async function kirimDataKeGoogleSheets(payload) {
+      const endpoint = getGoogleScriptUrl();
+      if (!isDatabaseConfigured()) {
+        console.warn("URL Google Sheets belum disetel!");
+        showToast("Perhatian: Database Google Sheets belum terpasang di sistem!", "error");
+        return false;
+      }
+
+      try {
+        // Menggunakan text/plain agar browser seluler tidak memicu CORS Preflight OPTIONS
+        await fetch(endpoint, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify(payload)
+        });
+        console.log("Data berhasil terkirim ke Google Cloud.");
+        setTimeout(tarikDataDariGoogleSheets, 1200);
+        return true;
+      } catch (err) {
+        console.error("Gagal mengirim data ke Google Sheets:", err);
+        return false;
+      }
+    }
+
+    async function tarikDataDariGoogleSheets(manual = false) {
+      const endpoint = getGoogleScriptUrl();
+      if (!isDatabaseConfigured()) {
+        document.getElementById("sheetsStatusText").textContent = "URL Database Belum Terpasang";
+        document.getElementById("sheetsStatusBadge").className = "flex items-center gap-1.5 bg-rose-50 text-rose-800 px-3 py-1.5 rounded-xl border border-rose-300 font-bold text-[11px]";
+        return;
+      }
+
+      try {
+        const res = await fetch(`${endpoint}?action=getAntrian&t=${Date.now()}`);
+        const data = await res.json();
+
+        if (data && data.antrian) {
+          antrianList = data.antrian;
+          const serverAktif = data.aktif || null;
+
+          if (serverAktif && serverAktif !== lastKnownPanggilan && !document.getElementById("viewDisplay").classList.contains("hidden")) {
+            bunyikanPanggilanSuara(serverAktif);
+          }
+          lastKnownPanggilan = serverAktif;
+          nomorPanggilanAktif = serverAktif;
+
+          updateDisplayMonitor();
+          renderTabelAdmin();
+
+          document.getElementById("sheetsStatusText").textContent = "Sinkron Google Sheets Aktif";
+          document.getElementById("sheetsStatusBadge").className = "flex items-center gap-1.5 bg-emerald-50 text-emerald-800 px-3 py-1.5 rounded-xl border border-emerald-300 font-bold text-[11px]";
+          
+          const cloudStat = document.getElementById("statCloudStatus");
+          if (cloudStat) cloudStat.textContent = "Online (" + antrianList.length + " data)";
+
+          if (manual) showToast("Data berhasil disinkronkan dengan Google Sheets!", "success");
+        }
+      } catch (err) {
+        console.warn("Sedang menghubungkan ke Google Sheets:", err);
+      }
+    }
+
+    // =========================================================================
+    // 4. PROSES PENDAFTARAN ANTRIAN DARI FORMULIR
+    // =========================================================================
+    function ambilNomorAntrian(e) {
+      e.preventDefault();
+      
+      const kategori = document.getElementById("kategoriPengunjung").value;
+      const pembayarNama = document.getElementById("pembayarNama").value.trim();
+      const pembayarWa = document.getElementById("pembayarWa").value.trim();
+      
+      let siswaNama = document.getElementById("siswaNama").value.trim();
+      let siswaKelas = document.getElementById("siswaKelas").value;
+      const siswaNis = document.getElementById("siswaNis").value.trim() || "-";
+
+      if (kategori !== "Orang Tua / Wali Murid" && kategori !== "Siswa / Siswi Sendiri") {
+        siswaNama = pembayarNama;
+        siswaKelas = kategori;
+      }
+
+      const jenisPembayaran = document.getElementById("jenisPembayaran").value;
+      const metodeBayar = document.getElementById("metodeBayar").value;
+
+      const nomorUrut = antrianList.length + 1;
+      const noAntrian = `KM-${String(nomorUrut).padStart(3, '0')}`;
+      const waktuSekarang = new Date().toLocaleString('id-ID', {
+        day: '2-digit', month: 'short', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+
+      // Tampilkan Nomor di Tiket Struk
+      document.getElementById("strukNoAntrian").textContent = noAntrian;
+      document.getElementById("strukWaktuAntrian").textContent = `${waktuSekarang} WIB`;
+      document.getElementById("strukNamaSiswa").textContent = siswaNama;
+      document.getElementById("strukKelas").textContent = siswaKelas;
+      document.getElementById("strukWali").textContent = pembayarNama;
+      document.getElementById("strukKeperluan").textContent = jenisPembayaran;
+      document.getElementById("strukMetode").textContent = metodeBayar;
+
+      document.getElementById("popNomorAntrian").textContent = noAntrian;
+      document.getElementById("popNamaSiswa").textContent = `Nama: ${siswaNama}`;
+      document.getElementById("popKelasSiswa").textContent = `Kelas/Kategori: ${siswaKelas}`;
+      document.getElementById("popKeperluan").textContent = `${jenisPembayaran} • ${metodeBayar}`;
+
+      const nomorWAFormatted = formatNomorWA(pembayarWa);
+      const pesanWA = 
+`*TIKET ANTRIAN PEMBAYARAN KOMITE MAN KOTA BLITAR*
+*MITRA KERJASAMA: PT BANK MANDIRI (PERSERO) TBK*
+--------------------------------------------------
+*Nomor Antrian* : *${noAntrian}*
+*Waktu Ambil*   : ${waktuSekarang} WIB
+*Nama Siswa*    : ${siswaNama} (${siswaKelas})
+*NISN/NIS*      : ${siswaNis}
+*Wali/Pembayar* : ${pembayarNama}
+*Keperluan*     : ${jenisPembayaran}
+*Metode Bayar*  : ${metodeBayar}
+
+*Status:* Terdaftar resmi di sistem antrian loket & database Google Sheets Komite.`;
+
+      const btnWA = document.getElementById("btnKirimWA");
+      if (btnWA) btnWA.href = `https://api.whatsapp.com/send?phone=${nomorWAFormatted}&text=${encodeURIComponent(pesanWA)}`;
+
+      // KIRIM KE GOOGLE SPREADSHEET PUSAT
+      kirimDataKeGoogleSheets({
+        action: "antrian",
+        noAntrian: noAntrian,
+        waktu: `${waktuSekarang} WIB`,
+        kategori: kategori,
+        pembayarNama: pembayarNama,
+        pembayarWa: pembayarWa,
+        siswaNama: siswaNama,
+        siswaKelas: siswaKelas,
+        siswaNis: siswaNis,
+        jenisPembayaran: jenisPembayaran,
+        metodeBayar: metodeBayar
+      });
+
+      document.getElementById("modalTiketAntrian").classList.remove("hidden");
+      document.getElementById("formAntrianKomite").reset();
+      toggleFormSiswa();
+      showToast(`Nomor ${noAntrian} berhasil dikirim ke Admin Komite!`, "success");
+    }
+
+    function tutupTiketLanjutMonitor() {
+      document.getElementById("modalTiketAntrian").classList.add("hidden");
+      switchView('display');
+    }
+
+    // =========================================================================
+    // 5. KONTROL TELLER ADMIN & MONITOR TV
+    // =========================================================================
+    function panggilAntrianBerikutnya() {
+      const berikutnya = antrianList.find(a => a.status === "Menunggu");
+      if (!berikutnya) return showToast("Tidak ada antrian yang menunggu!", "error");
+
+      berikutnya.status = "Dilayani";
+      nomorPanggilanAktif = berikutnya.noAntrian;
+
+      kirimDataKeGoogleSheets({
+        action: "updateStatus",
+        noAntrian: berikutnya.noAntrian,
+        statusBaru: "Dilayani",
+        nomorAktif: berikutnya.noAntrian
+      });
+
+      updateDisplayMonitor();
+      renderTabelAdmin();
+      bunyikanPanggilanSuara(berikutnya.noAntrian);
+      showToast(`Memanggil nomor antrian: ${berikutnya.noAntrian}`, "success");
+    }
+
+    function panggilUlangAntrian() {
+      if (!nomorPanggilanAktif) return showToast("Belum ada nomor yang aktif dipanggil!", "error");
+      
+      kirimDataKeGoogleSheets({
+        action: "updateStatus",
+        noAntrian: nomorPanggilanAktif,
+        statusBaru: "Dilayani",
+        nomorAktif: nomorPanggilanAktif
+      });
+
+      bunyikanPanggilanSuara(nomorPanggilanAktif);
+      showToast(`Panggilan ulang: ${nomorPanggilanAktif}`, "success");
+    }
+
+    function tandaiSelesaiAntrian() {
+      if (!nomorPanggilanAktif) return showToast("Tidak ada antrian aktif!", "error");
+      
+      kirimDataKeGoogleSheets({
+        action: "updateStatus",
+        noAntrian: nomorPanggilanAktif,
+        statusBaru: "Selesai",
+        nomorAktif: ""
+      });
+
+      const aktif = antrianList.find(a => a.noAntrian === nomorPanggilanAktif);
+      if (aktif) aktif.status = "Selesai";
+      nomorPanggilanAktif = null;
+
+      updateDisplayMonitor();
+      renderTabelAdmin();
+      showToast("Layanan transaksi antrian selesai!", "success");
+    }
+
+    function panggilSpesifik(idx) {
+      const item = antrianList[idx];
+      if (!item) return;
+
+      kirimDataKeGoogleSheets({
+        action: "updateStatus",
+        noAntrian: item.noAntrian,
+        statusBaru: "Dilayani",
+        nomorAktif: item.noAntrian
+      });
+
+      item.status = "Dilayani";
+      nomorPanggilanAktif = item.noAntrian;
+      updateDisplayMonitor();
+      renderTabelAdmin();
+      bunyikanPanggilanSuara(item.noAntrian);
+      showToast(`Memanggil ${item.noAntrian}`, "success");
+    }
+
+    function updateDisplayMonitor() {
+      const aktif = antrianList.find(a => a.noAntrian === nomorPanggilanAktif) || null;
+      const elNomor = document.getElementById("displayNomorAktif");
+      const elNama = document.getElementById("displayNamaAktif");
+      const elKeperluan = document.getElementById("displayKeperluanAktif");
+
+      if (aktif) {
+        elNomor.textContent = aktif.noAntrian;
+        elNama.textContent = `${aktif.siswaNama} (${aktif.siswaKelas}) - Wali: ${aktif.pembayarNama}`;
+        elKeperluan.textContent = `${aktif.jenisPembayaran} • ${aktif.metodeBayar}`;
+      } else {
+        elNomor.textContent = "KM-000";
+        elNama.textContent = "- Belum Ada Panggilan -";
+        elKeperluan.textContent = "Silakan Menunggu Panggilan";
+      }
+
+      const antrianMenunggu = antrianList.filter(a => a.status === "Menunggu");
+      document.getElementById("displaySisaAntrian").textContent = antrianMenunggu.length;
+
+      const listDisplay = document.getElementById("listMenungguDisplay");
+      listDisplay.innerHTML = "";
+      if (antrianMenunggu.length === 0) {
+        listDisplay.innerHTML = `<li class="p-2 bg-slate-50 text-slate-400 text-center rounded-xl font-medium">Tidak ada antrian menunggu</li>`;
+      } else {
+        antrianMenunggu.slice(0, 4).forEach((item) => {
+          listDisplay.innerHTML += `
+            <li class="flex items-center justify-between p-2.5 rounded-xl bg-blue-50/70 border border-blue-200">
+              <span class="font-mono font-black text-mandiriBlue text-sm">${item.noAntrian}</span>
+              <span class="text-slate-700 font-bold truncate max-w-[140px]">${item.siswaNama}</span>
+              <span class="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-bold">${item.siswaKelas}</span>
+            </li>
+          `;
+        });
+      }
+    }
+
+    function bunyikanPanggilanSuara(noAntrian) {
+      if (!('speechSynthesis' in window)) return;
+      const formattedNumber = noAntrian.replace("KM-", "K M ");
+      const kalimat = `Nomor antrian ${formattedNumber}, silakan menuju Loket Pembayaran Bank Mandiri.`;
+
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(kalimat);
+      utterance.lang = "id-ID";
+      utterance.rate = 0.9;
+      utterance.pitch = 1.0;
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function renderTabelAdmin() {
+      const tb = document.getElementById("tabelBodyAntrian");
+      if (!tb) return;
+      tb.innerHTML = "";
+
+      const total = antrianList.length;
+      const selesai = antrianList.filter(a => a.status === "Selesai").length;
+      const menunggu = antrianList.filter(a => a.status === "Menunggu").length;
+
+      document.getElementById("statTotalAntrian").textContent = total;
+      document.getElementById("statSelesai").textContent = selesai;
+      document.getElementById("statMenunggu").textContent = menunggu;
+
+      if (antrianList.length === 0) {
+        tb.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-400">Belum ada data pendaftar hari ini.</td></tr>`;
+        return;
+      }
+
+      antrianList.forEach((a, idx) => {
+        let badgeColor = "bg-amber-100 text-amber-800 border-amber-300";
+        if (a.status === "Dilayani") badgeColor = "bg-blue-100 text-mandiriBlue border-blue-400 animate-pulse";
+        if (a.status === "Selesai") badgeColor = "bg-emerald-100 text-emerald-800 border-emerald-300";
+
+        tb.innerHTML += `
+          <tr class="hover:bg-blue-50/50 transition">
+            <td class="p-2.5 font-mono font-black text-mandiriBlue">${a.noAntrian}</td>
+            <td class="p-2.5 font-bold text-slate-900">${a.siswaNama}<br><span class="text-[10px] text-blue-700 font-semibold">${a.siswaKelas}</span></td>
+            <td class="p-2.5 text-slate-700 font-medium">${a.pembayarNama}<br><span class="text-[10px] text-emerald-700">${a.pembayarWa}</span></td>
+            <td class="p-2.5 text-slate-700">${a.jenisPembayaran}</td>
+            <td class="p-2.5 text-slate-700 font-semibold text-[11px]">${a.metodeBayar}</td>
+            <td class="p-2.5 text-center">
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${badgeColor}">${a.status}</span>
+            </td>
+            <td class="p-2.5 text-center whitespace-nowrap">
+              <button onclick="panggilSpesifik(${idx})" class="px-2 py-1 bg-mandiriBlue hover:bg-blue-900 text-white rounded text-[10px] font-bold mr-1" title="Panggil Antrian">
+                <i class="fas fa-volume-high"></i>
+              </button>
+              <button onclick="cetakUlangStruk(${idx})" class="px-2 py-1 bg-slate-600 hover:bg-slate-700 text-white rounded text-[10px] font-bold" title="Cetak Ulang">
+                <i class="fas fa-print"></i>
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+    }
+
+    function cetakUlangStruk(idx) {
+      const a = antrianList[idx];
+      if (!a) return;
+      document.getElementById("strukNoAntrian").textContent = a.noAntrian;
+      document.getElementById("strukWaktuAntrian").textContent = `${a.waktu} WIB`;
+      document.getElementById("strukNamaSiswa").textContent = a.siswaNama;
+      document.getElementById("strukKelas").textContent = a.siswaKelas;
+      document.getElementById("strukWali").textContent = a.pembayarNama;
+      document.getElementById("strukKeperluan").textContent = a.jenisPembayaran;
+      document.getElementById("strukMetode").textContent = a.metodeBayar;
+      cetakTiketFisik();
+    }
+
+    function exportAntrianCSV() {
+      if (antrianList.length === 0) return showToast("Belum ada data untuk diunduh!", "error");
+      let csv = "Nomor Antrian,Waktu,Kategori,Nama Siswa/Tamu,Kelas,NISN,Wali Murid,WhatsApp,Jenis Pembayaran,Metode Bayar,Status\n";
+      antrianList.forEach(i => {
+        csv += `"${i.noAntrian}","${i.waktu}","${i.kategori || '-'}","${i.siswaNama}","${i.siswaKelas}","'${i.siswaNis}'","${i.pembayarNama}","'${i.pembayarWa}'","${i.jenisPembayaran}","${i.metodeBayar}","${i.status}"\n`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `Rekap_Antrian_Komite_MAN_Kota_Blitar_${Date.now()}.csv`;
+      a.click();
+    }
+
+    // SURVEI SKM
+    function renderFormUnsurBintang() {
+      const container = document.getElementById("containerUnsurBintang");
+      if (!container) return;
+      container.innerHTML = "";
+      UNSUR_SURVEY_DATA.forEach(unsur => {
+        const box = document.createElement("div");
+        box.className = "p-3.5 bg-blue-50/50 rounded-xl border border-blue-200";
+        box.innerHTML = `
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
+            <div>
+              <p class="font-bold text-xs text-mandiriBlue">${unsur.judul}</p>
+              <p class="text-[10px] text-slate-500">${unsur.desc}</p>
+            </div>
+            <span id="label_${unsur.id}" class="text-[11px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 self-start sm:self-auto">5 Bintang</span>
+          </div>
+          <div class="flex gap-1.5" id="stars_${unsur.id}">
+            ${[1, 2, 3, 4, 5].map(v => `
+              <i class="fa-solid fa-star text-2xl text-amber-400 star-icon drop-shadow-sm" onclick="pilihBintang('${unsur.id}', ${v})"></i>
+            `).join('')}
+          </div>
+        `;
+        container.appendChild(box);
+      });
+    }
+
+    function pilihBintang(id, val) {
+      nilaiBintangUnsur[id] = val;
+      const elLabel = document.getElementById(`label_${id}`);
+      if (elLabel) elLabel.textContent = `${val} Bintang`;
+      const stars = document.getElementById(`stars_${id}`).querySelectorAll(".star-icon");
+      stars.forEach((s, idx) => {
+        s.className = (idx < val) ? "fa-solid fa-star text-2xl text-amber-400 star-icon drop-shadow-sm" : "fa-solid fa-star text-2xl text-slate-300 star-icon";
+      });
+    }
+
+    function simpanSurveyKomite(e) {
+      e.preventDefault();
+      const nama = document.getElementById("surveyNama").value.trim();
+      const wa = document.getElementById("surveyWa").value.trim();
+      const saran = document.getElementById("surveySaran").value.trim() || "-";
+      const zi = document.querySelector('input[name="ziAntiKorupsi"]:checked').value;
+
+      kirimDataKeGoogleSheets({
+        action: "survei",
+        nama: nama,
+        wa: wa,
+        u1: nilaiBintangUnsur.u1,
+        u2: nilaiBintangUnsur.u2,
+        u3: nilaiBintangUnsur.u3,
+        u4: nilaiBintangUnsur.u4,
+        zi: zi,
+        saran: saran
+      });
+
+      showToast("Survei berhasil dikirim & tersimpan di Google Sheets!", "success");
+      document.getElementById("formSurveyKomite").reset();
+      renderFormUnsurBintang();
+      setTimeout(() => switchView('tamu'), 1500);
+    }
+
+    // HELPER & UI
+    function toggleFormSiswa() {
+      const kat = document.getElementById("kategoriPengunjung").value;
+      const sec = document.getElementById("sectionSiswa");
+      const siswaNamaInput = document.getElementById("siswaNama");
+      const siswaKelasInput = document.getElementById("siswaKelas");
+
+      if (kat === "Orang Tua / Wali Murid" || kat === "Siswa / Siswi Sendiri") {
+        sec.classList.remove("hidden");
+        siswaNamaInput.required = true;
+        siswaKelasInput.required = true;
+      } else {
+        sec.classList.add("hidden");
+        siswaNamaInput.required = false;
+        siswaKelasInput.required = false;
+      }
+    }
+
+    function togglePasswordVisibility() {
+      const input = document.getElementById("adminPass");
+      const icon = document.getElementById("eyeIcon");
+      if (input.type === "password") {
+        input.type = "text";
+        icon.className = "fas fa-eye-slash";
+      } else {
+        input.type = "password";
+        icon.className = "fas fa-eye";
+      }
+    }
+
+    function showQrModal() { 
+      generateQrStand(); 
+      document.getElementById("modalQR").classList.remove("hidden"); 
+    }
+    function closeQrModal() { document.getElementById("modalQR").classList.add("hidden"); }
+    function showJadwalModal() { document.getElementById("modalJadwal").classList.remove("hidden"); }
+    function closeJadwalModal() { document.getElementById("modalJadwal").classList.add("hidden"); }
+
+    function cetakStandMeja() {
+      document.body.className = "cetak-stand";
+      window.print();
+      document.body.className = "bg-gradient-to-br from-slate-100 via-sky-50 to-blue-50 min-h-screen text-slate-800 font-sans antialiased flex flex-col justify-between selection:bg-mandiriBlue selection:text-white";
+    }
+
+    function cetakTiketFisik() {
+      document.body.className = "cetak-tiket";
+      window.print();
+      document.body.className = "bg-gradient-to-br from-slate-100 via-sky-50 to-blue-50 min-h-screen text-slate-800 font-sans antialiased flex flex-col justify-between selection:bg-mandiriBlue selection:text-white";
+    }
+
+    function switchView(view) {
+      ['viewTamu', 'viewDisplay', 'viewSurvey', 'viewAdmin'].forEach(id => document.getElementById(id).classList.add('hidden'));
+      ['navTamu', 'navDisplay', 'navSurvey', 'navAdmin'].forEach(id => {
+        document.getElementById(id).className = "px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-white text-mandiriBlue hover:bg-blue-50 border-2 border-blue-200 transition flex items-center gap-1.5 shadow-sm";
+      });
+
+      if (view === 'tamu') {
+        document.getElementById('viewTamu').classList.remove('hidden');
+        document.getElementById('navTamu').className = "px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-mandiriBlue text-white shadow-md border border-blue-900 transition flex items-center gap-1.5";
+      } else if (view === 'display') {
+        document.getElementById('viewDisplay').classList.remove('hidden');
+        document.getElementById('navDisplay').className = "px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-mandiriBlue text-white shadow-md border border-blue-900 transition flex items-center gap-1.5";
+        updateDisplayMonitor();
+      } else if (view === 'survey') {
+        document.getElementById('viewSurvey').classList.remove('hidden');
+        document.getElementById('navSurvey').className = "px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-mandiriBlue text-white shadow-md border border-blue-900 transition flex items-center gap-1.5";
+      } else if (view === 'admin') {
+        document.getElementById('viewAdmin').classList.remove('hidden');
+        document.getElementById('navAdmin').className = "px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-mandiriBlue text-white shadow-md border border-blue-900 transition flex items-center gap-1.5";
+        if (sessionStorage.getItem("adminKomiteAuth") === "true") {
+          document.getElementById("adminLoginBox").classList.add("hidden");
+          document.getElementById("adminDashboard").classList.remove("hidden");
+          renderTabelAdmin();
+        } else {
+          document.getElementById("adminLoginBox").classList.remove("hidden");
+          document.getElementById("adminDashboard").classList.add("hidden");
+        }
+      }
+    }
+
+    function handleAdminLogin(e) {
+      e.preventDefault();
+      const u = document.getElementById("adminUser").value.trim().toLowerCase();
+      const p = document.getElementById("adminPass").value;
+
+      if (ADMIN_CRED.users.includes(u) && p === ADMIN_CRED.pass) {
+        sessionStorage.setItem("adminKomiteAuth", "true");
+        document.getElementById("adminLoginBox").classList.add("hidden");
+        document.getElementById("adminDashboard").classList.remove("hidden");
+        renderTabelAdmin();
+        showToast("Login Admin Komite berhasil!", "success");
+      } else {
+        showToast("Username atau Password Admin salah!", "error");
+      }
+    }
+
+    function logoutAdmin() {
+      sessionStorage.removeItem("adminKomiteAuth");
+      document.getElementById("adminDashboard").classList.add("hidden");
+      document.getElementById("adminLoginBox").classList.remove("hidden");
+      showToast("Berhasil logout", "success");
+    }
+
+    function formatInputNomor(input) {
+      input.value = input.value.replace(/[^0-9]/g, '');
+    }
+
+    function formatNomorWA(nomor) {
+      if (!nomor) return "";
+      let cleaned = ('' + nomor).replace(/\D/g, '');
+      if (cleaned.startsWith('0')) cleaned = '62' + cleaned.substring(1);
+      else if (cleaned.startsWith('8')) cleaned = '62' + cleaned;
+      return cleaned;
+    }
+
+    function showToast(message, type = "success") {
+      const container = document.getElementById("toastContainer");
+      if (!container) return;
+      const toast = document.createElement("div");
+      toast.className = `p-3.5 rounded-2xl shadow-xl text-white text-xs font-bold flex items-center gap-2 transform transition-all duration-300 translate-y-2 opacity-0 pointer-events-auto ${type === 'success' ? 'bg-emerald-600' : 'bg-rose-600'}`;
+      toast.innerHTML = `<i class="fas ${type === 'success' ? 'fa-check-circle' : 'fa-circle-exclamation'} text-base"></i> <span>${message}</span>`;
+      container.appendChild(toast);
+      
+      requestAnimationFrame(() => toast.classList.remove("translate-y-2", "opacity-0"));
+      setTimeout(() => {
+        toast.classList.add("opacity-0", "translate-y-2");
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    function startRealtimeClock() {
+      function tick() {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('id-ID') + " WIB";
+        document.getElementById("liveClock").textContent = timeStr;
+        const dispClock = document.getElementById("displayClock");
+        if (dispClock) dispClock.textContent = timeStr;
+
+        document.getElementById("liveDate").textContent = now.toLocaleDateString('id-ID', {
+          weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+        });
+
+        const day = now.getDay();
+        const mins = now.getHours() * 60 + now.getMinutes();
+        let isOpen = false;
+        if (day >= 1 && day <= 4 && mins >= 480 && mins <= 870) isOpen = true;
+        if (day === 5 && mins >= 480 && mins <= 690) isOpen = true;
+
+        const dot = document.getElementById("statusDot");
+        const txt = document.getElementById("statusText");
+        if (isOpen) {
+          dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 blink-status";
+          txt.textContent = "LOKET BUKA";
+          txt.className = "font-black text-xs text-mandiriBlue";
+        } else {
+          dot.className = "w-2.5 h-2.5 rounded-full bg-rose-500";
+          txt.textContent = "LOKET TUTUP";
+          txt.className = "font-black text-xs text-rose-700";
+        }
+      }
+      tick();
+      setInterval(tick, 1000);
+    }
+  </script>
+</body>
+</html>
